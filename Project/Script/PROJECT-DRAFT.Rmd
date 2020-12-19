@@ -1,0 +1,531 @@
+---
+title: "Y3865991"
+author: "Daniel Sproston"
+output:
+  bookdown::html_document2: default
+  bookdown::word_document2: default
+  bookdown::pdf_document2: default
+  bibliography: tReferences.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+# Introduction
+Despite the importance of soil for agricultural purposes, repetitive cultivation, livestock overgrazing and trampling are contributing to mass reduction in soil quality (Soane and van Ouwerkerk, 1995; Chyba et al., 2014). Efficient utilization of agricultural land is becoming more important every year, for economic and environmental benefits (Bennett et al., 2009) [@Bennett2009-xx]. Furthermore, maintenance of a secure ecosystem provides several benefits to the quality of agricultural land, such as Soil Organic Carbon increase, enhanced water quality and increased C sequestration  agricultural land management (Martin-Ortega et al., 2015; Holden et al., 2017). 
+
+Hedgerows provide benefits to the ecosystem above ground by enhancing bird and small mammal populations (Silva and Prince, 2008), and it is suggested to increase surrounding soil quality with increased underground biodiversity (Monokrousos et al.(2006).)  Fungal symbionts present in hedgerow roots help hedgerow plants harvest abiotic nutrients from the soil (Monokrousos et al., 2006). The following data (FROM MAIN DATASET REFERENCE) was collected with the hypothesis that fungal communities beneath hedgerows would differ to those in soils for the adjacent landscape components.
+
+The purpose of this script is to efficiently import the data, ensure it is tidy, and explore whether the hypothesis may be true. The methods should be sufficiently explained, with data visualization and ensuring the following script can be replicated on Github. 
+
+## Requirements:
+
+The user must ensure they install all the specific packages. Instructions on how to do so are included in the README.txt, and all packages can be found on [THATPACKAGEPAGE]. 
+
+```{r packages, include = FALSE}
+#Please copy and paste all packages from the README.txt file into this space between the lines as per instructions
+#==================
+
+#install.packages("ggplot2")
+#install.packages("tidyr")
+#install.packages("dplyr")
+#install.packages("naniar")
+#install.packages("seqinr")
+#install.packages("MASS")
+#BiocManager::install(c("vegan"))
+ 
+
+#==================
+
+#Once you run this chunk and all of the packages are installed, please remove the above "install.packages..." lines of code, so you can run the whole script again repeatedly without reinstalling the packages
+
+```
+
+## The Data:
+
+The specific data included [Holden2019-ok] was collected from the Yorkshare VLE, a student webpage accessible to members of York University. It was obtained on the VLE for convenience sake, as the [Holden2019-ok] did not include a version of the data that was directly transferable to Rstudio. 
+
+```{r data import, message=FALSE, warning=FALSE, include=FALSE}
+#Correctly setting working directory
+setwd("~/University/Data Analysis Y4/Project/Data")
+
+#Read in dataset via csv format
+ITS_counts <- read.csv("ITS_table_cleaned.csv") 
+Locations <- read.csv("GroupVars.csv")
+```
+
+The data includes samples of soil collected from 4 fields with 3 sampling locations per field (12 total), and the fungi were partially sequenced at a specific DNA region that can act as a barcode of that species of fungus.These Internal Transcribed Spacer 2 (ITS2) units 
+
+### Column Description
+
+Similar ITS2 sequences are grouped into an Operational Taxonomic Unit (OTU). The first column of the war imported data (OTU) represents each OTU/fungal species.
+
+Each column beginning with a W represents a different environmental sample well, with the lists being number of sequence reads corresponding to a particular OTU. 
+
+Sums are all wells put to a specific OTU reference.
+
+Taxonomy is self explanatory.
+
+P.value represents the significance of match of sample to closest OTU.
+
+Sequence was the specific OTU sequence.
+
+(There are many NA values, which (according to the dataset author) correspond to samples with no significant OTU match, due potentially to:
+1. Sequences might might still be fungal, but still divergent from any known reference ITS2
+2. The sequencing may be low quality
+3. The sequences themselves may be contaminated with non fungal origin.)
+
+### Data Tydying
+
+```{r Checking data, echo=FALSE, include=TRUE}
+#check what each column is set as, whether it be factor, numeric, ect 
+dim(ITS_counts)
+```
+
+We can check whether each column is set as factors, numeric, integers, ect. However, since there are 53 variables, most of them being the sample wells, we should perform "str()" on a dataset with fewer WELL columns.
+
+```{r more checking, echo=FALSE, include=TRUE}
+#check what each column is set as, whether it be factor, numeric, ect. We will call this dataset strITS 
+
+strITS <- ITS_counts[-c(3:48)]
+str(strITS)
+```
+Now the output doesn't look as messy, ans shows us the format of each column, which will become especially useful later when visualizing the data. We are of course assuming that all other wells are in the same format as "W14" (which they are, but for representational purposes in knit format, they are not included), and you are welcome to run "str(ITS_counts)" for validation if you wish.
+
+We can now check the data is in tidy format.
+
+According to [TIDYDATA] tidy data must satisfy these three requirements (or technically 2 of the 3, as its impossible to only satisfy 2):
+1. Each Variable must have its own column
+2. Each observation must have its own row
+3. Each value must have its own cell
+
+```{r tidying data, message=FALSE, warning=FALSE, include=FALSE}
+#For simplicities sake we are also going to rename some Well columns so they are arranged in the correct order, which will allow us to make better sense of the graphs later on:
+#colnames(ITS_counts)[17] <- "W03"
+```
+
+If we look at the data, the taxonomy column technically includes several variables (species, genus, family ect). We can therefore split the taxonomy into individual classification ranks. 
+
+```{r tidying data1, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyr)#for splitting columns
+ITS_counts1 <- separate(ITS_counts, col = taxonomy, 
+                        into = c("Kingdom", "Phylum", "Class", "Order", 
+                                 "Family", "Genus", "Species"), sep = ";")
+```
+
+Despite the ugly "k_" characterization before the real value, each taxonomic variable now has its own column. 
+The "well count" values are split into many columns, despite it being one variable. We can put all counts into one column, by assigning "well" as one variable, and resulting in "counts" being the other. This will cause a lot more repeating rows, but will make the data easier to analyse. 
+
+```{r tidying data2, message=FALSE, warning=FALSE, include=FALSE}
+library(dplyr) #has gather function, to put all well counts into one column
+ITStidy <- gather(data = ITS_counts1, key = "Well", value = "Count", 2:48)
+```
+
+
+To confirm we have accurately tidied the data, we can repeat the "dim" function, to check we have only 14 columns and 44133 rows. It should be noted that should we wish to use the "sum" column for data visualization or analysis later, it would be more practical to revert back to the original data format (as the tidy format has many repeating "sum" values). 
+
+```{r Checking data4, echo=FALSE, include=TRUE}
+#check what each column is set as, whether it be factor, numeric, ect 
+str(ITStidy)
+dim(ITStidy)
+```
+The data should not be imported and tidy. 
+
+```{r renaming data, echo=FALSE, include=TRUE}
+#There is a reference column, labelled "something", which is not relevant to our investigation, and so we shall remove it.
+ITStidy <- subset(ITStidy, select = -something)
+
+#We will also rename the first column to OTU for simplicity
+colnames(ITStidy)[1] <- "OTU"
+
+#We will change the OTU, wells, and taxonomy to a factor variable, and counts and sums to a numeric variable
+ITStidy$OTU <- as.factor(ITStidy$OTU)
+ITStidy$sum <- as.numeric(ITStidy$sum)
+ITStidy$Kingdom <- as.factor(ITStidy$Kingdom)
+ITStidy$Phylum <- as.factor(ITStidy$Phylum)
+ITStidy$Class <- as.factor(ITStidy$Class)
+ITStidy$Order <- as.factor(ITStidy$Order)
+ITStidy$Family <- as.factor(ITStidy$Family)
+ITStidy$Genus <- as.factor(ITStidy$Genus)
+ITStidy$Species <- as.factor(ITStidy$Species)
+ITStidy$p.value <- as.numeric(ITStidy$p.value)
+ITStidy$sequence <- as.factor(ITStidy$sequence)
+ITStidy$Well <- as.factor(ITStidy$Well)
+ITStidy$Count <- as.numeric(ITStidy$Count)
+str(ITStidy)
+```
+
+We can now import a second dataset that includes information regarding where the Well samples were collected, and will then collate the two datasets. 
+
+```{r data import2, message=FALSE, warning=FALSE, include=FALSE}
+#Read in dataset via csv format
+#making the sample well column the common column shared by the two datasets
+colnames(Locations) [1] <- "Well"
+
+Fungusdata <- merge(ITStidy, Locations)
+
+#check new dataset has correct variables assigned for analysis
+str(Fungusdata)
+Fungusdata$Field <- as.factor(Fungusdata$Field)
+Fungusdata$HedgeLocation <- as.factor(Fungusdata$HedgeLocation)
+Fungusdata$Root.number <- as.factor(Fungusdata$Root.number)
+
+#Removing invalid results/No counts
+#FungusnoNA <- Fungusdata[Fungusdata$Count ==0,]
+library(naniar)
+#set "unidentified" to NA for all taxonomy columns
+Fungusdata[Fungusdata == "k__unidentified"] <- NA
+Fungusdata[Fungusdata == "p__unidentified"] <- NA
+Fungusdata[Fungusdata == "c__unidentified"] <- NA
+Fungusdata[Fungusdata == "o__unidentified"] <- NA
+Fungusdata[Fungusdata == "f__unidentified"] <- NA
+Fungusdata[Fungusdata == "g__unidentified"] <- NA
+Fungusdata[Fungusdata == "s__unidentified"] <- NA
+```
+
+# Data analysis
+
+With the OTU samples, and locations collected now all in one dataframe, we can visualise the data for a clearer understanding of whether our hypothesis is correct.
+
+# Visualization
+
+```{r fig.cap="Field locations"}
+# ggplot functions can be found on [@ggplotDATA]
+library(ggplot2)
+ggplot(Fungusdata,aes(x = Longitude, y = Latitude, color = HedgeLocation, shape = Field)) +
+  geom_point(size = 3) +
+scale_color_manual(values=c("light blue", 'blue', 'dark blue', "dark red", 
+                            'black', 'red', 'light green', 'green', 
+                            'dark green', 'orange', 'yellow', "brown")) +
+  theme(axis.line.x = element_line(color = "black", size = 1),
+        axis.line.y = element_line(color = "black", size = 1),
+        axis.ticks = element_line(size = 1, colour = "black")) +
+  theme(panel.background = element_rect(fill = "white",colour = "black",
+                                        size = 1, linetype = "solid")) +
+  theme(text = element_text(size = 12), axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12), legend.title = element_text(size = 15),
+        legend.text = element_text(size = 10), plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15)) +
+  labs(subtitle="Locations of Hedgerow sample sites", 
+       title="Locations", 
+       caption = "Source: [@data]",
+       color = "Hedgerow Site",
+       shape = "Field") 
+
+```
+
+The above graph displays where the Hedgerow samples were located. The coloring of this graph should help when we refer which well came from which Hedgerow sample.
+
+
+```{r graphs0.1, warning=TRUE, include=FALSE}
+#Remove NA values from the graph by making a new dataset
+Fungusdata_no_na <- na.omit(Fungusdata)
+#removing 0 counts
+Fungusdata_no_na <- Fungusdata_no_na[Fungusdata_no_na$Count > 0,]
+```
+
+
+```{r fig.cap="Pie chart of Phylum proportions"}
+#library(dplyr) to show variability of counts by phylum
+pie <- ggplot(Fungusdata_no_na, aes(x = "", y = Count, fill = Fungusdata_no_na$Phylum)) + 
+  geom_bar(width = 1, stat = "identity") +
+  #geom_text(aes(y = cumsum(Count) - 1*Count, label = Count), color = "black") +
+ # scale_fill_manual(values=c("blue", 'red', 'green', "yellow", 
+  #                           'black', 'cyan', 'white', 'brown', 
+   #                          'dark green')) +
+  theme(plot.title = element_text(hjust=0.5), 
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text=element_text(size=0, color = "white", margin = margin(t = 100)),
+        axis.title=element_text(color = "black", size=20),
+        panel.background = element_rect(fill = "white",colour = "white",
+                                        size = 0, linetype = "solid"),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 10)) +
+  labs(subtitle="Proportion of each Phylum in total counts", 
+       y="", 
+       x="", 
+       title="Phylum proportion", 
+       caption = "Source:[Holden2019-ok]",
+       fill = "Phylum") 
+
+pie + coord_polar(theta = "y", start=0) 
+```
+
+The pie chart summarises the proportion of phylum
+
+
+```{r fig.cap="Phylum diversity by field"}
+ggplot(Fungusdata_no_na, aes(x = Fungusdata_no_na$Field, y = Fungusdata_no_na$Count, fill = Fungusdata_no_na$Phylum)) +
+  geom_bar(stat = "identity", position = position_stack(reverse = TRUE)) +
+  ylim(0, 125000) + scale_y_continuous(expand = c(0,0)) +
+  geom_text(aes(x=1, y=125000, label="")) +
+  theme(axis.line.x = element_line(color = "black", size = 1),
+        axis.line.y = element_line(color = "black", size = 1),
+        axis.ticks = element_line(size = 1, colour = "black"),
+        panel.background = element_rect(fill = "white",colour = "white",
+                                        size = 1, linetype = "solid"),
+        text = element_text(size = 12), 
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12), 
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 10), 
+        plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 15), 
+        axis.title.y = element_text(size = 15)) +
+  labs(subtitle="Phylum proportion per Field", 
+       x="Field", 
+       y="Count", 
+       title="Phylum proportion", 
+       caption = "Source:[Holden2019-ok]",
+       fill = "Phylum") 
+```
+
+```{r fig.cap="Fungus count by Class, per field"}
+ggplot(Fungusdata_no_na, aes(x = Fungusdata_no_na$HedgeLocation, y = Fungusdata_no_na$Count, fill = Fungusdata_no_na$Phylum)) +
+  geom_bar(stat = "identity", position = position_stack(reverse = TRUE)) +
+  ylim(0, 50000) + scale_y_continuous(expand = c(0,0)) +
+  geom_text(aes(x=1, y=50000, label="")) +
+  theme(axis.line.x = element_line(color = "black", size = 1),
+        axis.line.y = element_line(color = "black", size = 1),
+        axis.ticks = element_line(size = 1, colour = "black"),
+        panel.background = element_rect(fill = "white",colour = "white",
+                                        size = 1, linetype = "solid"),
+        text = element_text(size = 12), 
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 7), 
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 10), 
+        plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 15), 
+        axis.title.y = element_text(size = 15)) +
+  geom_vline(xintercept=3.5, linetype="dashed", 
+             color = "black", size=0.7) +
+  geom_vline(xintercept=6.5, linetype="dashed", 
+             color = "black", size=0.7) +
+  geom_vline(xintercept=9.5, linetype="dashed", 
+             color = "black", size=0.7) +
+  annotate("text", x = 2, y = 71000, label = "BSSE") +
+  annotate("text", x = 5, y = 71000, label = "BSSW") +
+  annotate("text", x = 8.6, y = 71000, label = "Copse") +
+  annotate("text", x = 11.9, y = 71000, label = "Hill") +
+  labs(subtitle="phylum by class", 
+       x="Hedge Locations", 
+       y="Count", 
+       title="phylum proportion", 
+       caption = "Source: DATA",
+       fill = "phylum") 
+```
+
+The stacked barplot gives a clearer summary of the proportion of phylum per field. However, to get a clearer view of this in geographical context, we can look at the individual hedge sites, and apply the stacked chart by phylum before to EACH individual collection site, for a more practical context of where the variety is. 
+
+```{r fig.cap="Phylum proportion by field comparison"}
+ggplot(Fungusdata_no_na, aes(x = Fungusdata_no_na$HedgeLocation, y = Fungusdata_no_na$Count, fill = Fungusdata_no_na$Phylum)) +
+  geom_bar(stat = "identity", position = position_stack(reverse = TRUE)) +
+  facet_wrap(~ Field) +
+  ylim(0, 50000) + scale_y_continuous(expand = c(0,0)) +
+  geom_text(aes(x=1, y=50000, label="")) +
+  theme(axis.line.x = element_line(color = "black", size = 1),
+        axis.line.y = element_line(color = "black", size = 1),
+        axis.ticks = element_line(size = 1, colour = "black"),
+        panel.background = element_rect(fill = "white",colour = "white",
+                                        size = 1, linetype = "solid"),
+        text = element_text(size = 12), 
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 7), 
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 10), 
+        plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 15), 
+        axis.title.y = element_text(size = 15)) +
+  labs(subtitle="Counts by phylum", 
+       x="Well", 
+       y="Count", 
+       title="Phylum proportion", 
+       caption = "Source: DATA",
+       fill = "Phylum") 
+
+```
+
+# statistical analysis
+```{r chi, warning=FALSE, include=TRUE}
+
+#Get taxonomies
+taxonomies=as.character(ITS_counts[,"taxonomy"])
+#split by the pattern ";c__"
+split_by_phylum=strsplit(taxonomies, ";c__")
+#make a new empty vector called phyla
+phyla=c() 
+## the variable i will take values between 1 and length(split_by_phylum)
+for(i in c(1:length(split_by_phylum)))
+  # set the i-th element of the vector phyla to the kingdom/phylum of the i-th 
+  #element of split_by_phylum
+{phyla[i]=split_by_phylum[[i]][1]}
+#loop over every element in the list split_by_phylum 
+phyla=sapply(split_by_phylum, function(i){ i[1] })
+#unique values of vector
+unique(phyla)
+#shows where na is
+na_phyla=is.na(phyla)
+na_phyla
+
+na_indices=which(na_phyla)
+na_indices
+#You will need to remove the character from the first line of code to install the necessary package
+#replace missing values with other
+phyla[which(is.na(phyla))]="other"
+library(seqinr)
+write.fasta(as.list(ITS_counts[na_indices,"sequence"]), 
+            rownames(ITS_counts)[na_indices], file.out="ITS_na.fasta")
+
+counts_by_phylum=sapply(unique(phyla), function(i){
+  # step 1: get indices that correspond to each phylum:
+  index_phylum=which(phyla==i)
+  # step 2: extract the sum column
+  sum_by_phylum=ITS_counts[index_phylum,'sum']
+  # step 3: find the sum of all these values
+  sum(sum_by_phylum)
+})
+counts_by_phylum #print output
+#Shorten names
+phylum_names=names(counts_by_phylum) 
+phylum_split=strsplit(phylum_names, ";p__") 
+phylum_labels_long=sapply(phylum_split, function(i){i[2]})
+#extract first 5 letters of each phylum
+phylum_labels=substring(phylum_labels_long, 1, 2)
+#apply short names to phylum list
+names(counts_by_phylum)=phylum_labels
+
+sampleColumns=grep("^W", colnames(ITS_counts))
+colnames(ITS_counts)[sampleColumns]
+
+ITS_counts_envSamples=ITS_counts[,sampleColumns] #extract the columns of ITS_counts that correspond to environmental samples
+hedgerow_counts_by_phylum=apply(ITS_counts_envSamples, 2, function(col){ #for every column with an environmental sample
+  sapply(unique(phyla), function(i){ # and for every unique phylum
+    #Step 1:
+    index_phylum=which(phyla==i)
+    #Step 2:
+    sum_by_phylum=col[index_phylum]
+    #Step 3:
+    sum(sum_by_phylum) 
+  })
+})
+#install.packages("MASS")
+library(MASS)
+chisq.test(hedgerow_counts_by_phylum)
+over5=length(which(hedgerow_counts_by_phylum>5))
+over5/length(hedgerow_counts_by_phylum)
+```
+Degrees of freedom 644, p value <0.05, so significant.
+We can reject the null hypothesis, so Phylum and location are not independent, so diversity is associated. 
+
+if I were to randomly select two individuals from this environment, what is the probability that they will be the same kind of organism (for instance, the same species)? This is the definition of Simpson’s Index (D). In a very diverse environment, it gives a low value (because the probability of selecting the same kind of organism twice is very low) and vice versa. Simpson’s Index of Diversity is 1-D, so that high numbers mean more diversity.REWORD
+
+```{r simpson, message=FALSE, warning=FALSE, include=TRUE}
+#BiocManager::install(c("vegan"))
+library("vegan")
+
+simpson=diversity(t(hedgerow_counts_by_phylum), index="simpson")
+simpson
+hist(simpson)
+
+unique_fields=unique(Locations[,"Field"])
+simpson_by_field=sapply(unique_fields, function(i){ #for every field:
+  rows_in_field=which(Locations[,"Field"]==i) #find the rows that correspond to that field
+  rownames_in_field=rownames(Locations)[rows_in_field] # find the rownames of these rows
+  simpson[rows_in_field] #get the Simpson Index of Diversity for these rows
+})
+simpson_by_field
+
+#boxplot od simpson
+boxplot(simpson_by_field)
+```
+```{r simpson2, message=FALSE, warning=FALSE, include=TRUE}
+#BiocManager::install(c("vegan"))
+library("vegan")
+
+simpson2=diversity(t(hedgerow_counts_by_phylum), index="simpson")
+simpson2
+hist(simpson2)
+
+unique_well=unique(Locations[,"Well"])
+
+simpson_by_well=sapply(unique_well, function(i){ #for every field:
+  rows_in_well=which(Locations[,"Well"]==i) #find the rows that correspond to that field
+  rownames_in_well=rownames(Locations)[rows_in_well] # find the rownames of these rows
+  simpson[rows_in_well] #get the Simpson Index of Diversity for these rows
+})
+simpson_by_well
+
+#boxplot od simpson
+boxplot(simpson_by_well)
+```
+simpson values, higher values mean better diversity - therefore the values of each well range significantly. For more specific results we can look more at simpson phylum by field and running an anova to comapre them. Since a Simpson diversity field is mainly useful when comparing fields statistically, Simpson is not that useful on its own. 
+
+
+```{r ANOVA, message=FALSE, warning=FALSE, include=TRUE}
+
+sampleOrder = rownames(Locations) #something wrong here
+df_simpson= data.frame(Field = Locations[,"Field"], simpson=simpson[sampleOrder])
+
+simpson <- data.frame(simpson)
+
+simpson <- cbind(rownames(simpson), simpson)
+rownames(simpson) <- NULL
+colnames(simpson) <- c("Well","Simpson")
+simpson
+
+df_simpson <- merge(simpson, Locations)
+df_simpson
+#AAAAAAAAAAAAAAAAA
+linMod = lm(Simpson ~ Field, data = df_simpson)
+anova(linMod)
+```
+
+# Conclusions
+
+As we have seen by the results of the ANOVA, hopefully I can interpret what it means.
+Anover performed on linear model that predicts index diversity based on linear model of simpsons by field.
+P value =  0.02552 * so significant difference in diversity between fields then.
+
+
+Okay, draft OVER
+BUT need more data packages to reference potentially
+Also format in terms of EXAMPLE data 
+AND RENAME lots of stuff so it doesnt look like you copied shit, go by reverse
+ONLY 1000 WORDS IN RMD, DO MORE (refs count too i think, Harvard at the bottom )
+
+# References
+
+1.	Bennett, E. M., Peterson, G. D. and Gordon, L. J. (2009). Understanding relationships among multiple ecosystem services. Ecology letters, 12 (12), pp.1394–1404.
+
+2.	Charif, D. et al. (2007). The seqinr Package. R Packag. [Online]. Available at: http://ftp.uni-bayreuth.de/math/statlib/R/CRAN/doc/packages/seqinr.pdf.
+
+3.	Holden, J. et al. (2017). Water quality and UK agriculture: challenges and opportunities. Wiley Interdisciplinary Reviews: Water, 4 (2), p.e1201. [Online]. Available at: doi:10.1002/wat2.1201.
+
+4.	Holden, J. et al. (2019). The role of hedgerows in soil functioning within agricultural landscapes. Agriculture, ecosystems & environment, 273, pp.1–12.
+
+5.	Jari Oksanen, F. G. B. et al. (2018). Vegan: community ecology package. R package version, 2 (6).
+
+6.	Mailund, T. (2019). Manipulating Data Frames: dplyr. In: Mailund, T. (Ed). R Data Science Quick Reference: A Pocket Guide to APIs, Libraries, and Packages. Berkeley, CA: Apress. pp.109–160.
+
+7.	Martin-Ortega, J. et al. (2015). Water ecosystem services: a global perspective. UNESCO Publishing.
+
+8.	Monokrousos, N. et al. (2006). Soil quality variables in organically and conventionally cultivated field sites. Soil biology & biochemistry, 38 (6), pp.1282–1289.
+
+9.	Ripley, B. and Others. (2011). MASS: support functions and datasets for Venables and Ripley’s MASS. R package version, 7, pp.3–29.
+
+10.	Silva, M. and Prince, M. E. (2008). The Conservation Value of Hedgerows for Small Mammals in Prince Edward Island, Canada. The American Midland Naturalist, 159 (1), pp.110–124. [Accessed 17 December 2020].
+
+11.	Soane, B. D. and van Ouwerkerk, C. (1995). Implications of soil compaction in crop production for the quality of the environment. Soil and Tillage Research, 35 (1-2), pp.5–22. [Online]. Available at: doi:10.1016/0167-1987(95)00475-8.
+
+12.	Tierney, N. et al. (2019). Naniar: data Structures, Summaries, and Visualisations for missing data. R Package.
+
+13.	Wickham, H. and Wickham, M. H. (2007). The ggplot package. [Online]. Available at: http://ftp.uni-bayreuth.de/math/statlib/R/CRAN/doc/packages/ggplot.pdf.
+
+14.	Wickham, H. and Wickham, M. H. (2017). Package ‘tidyr’. Easily Tidy Data with’spread'and'gather ()'Functions. [Online]. Available at: https://mran.microsoft.com/snapshot/2018-03-22/web/packages/tidyr/tidyr.pdf.
+

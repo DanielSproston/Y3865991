@@ -1,0 +1,24 @@
+---
+title: "Fungal Diversity Comparison Between Hedgerows"
+author: "Examination number: Y3865991"
+output:
+  bookdown::html_document2: default
+  number_sections: false
+  bookdown::word_document2: default
+  bookdown::pdf_document2: default
+  bibliography: "University/Data_Analysis_Y4/Project/References/References.bib"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+# Introduction
+Despite the importance of soil for agricultural purposes, repetitive cultivation, livestock overgrazing and trampling are contributing to mass reduction in soil quality (@Soane1995-dn; Chyba et al., 2014). Efficient utilization of agricultural land is becoming more important every year, for economic and environmental benefits [@Bennett2009-xx,
+  title    = "Understanding relationships among multiple ecosystem services"]. Furthermore, maintenance of a secure ecosystem provides several benefits to the quality of agricultural land, such as Soil Organic Carbon increase, enhanced water quality and increased C sequestration  agricultural land management (Martin-Ortega et al., 2015; Holden et al., 2017). [@valiant1990] 
+
+Hedgerows provide benefits to the ecosystem above ground by enhancing bird and small mammal populations (Silva and Prince, 2008), and it is suggested to increase surrounding soil quality with increased underground biodiversity (Monokrousos et al.(2006).)  Fungal symbionts present in hedgerow roots help hedgerow plants harvest abiotic nutrients from the soil (Monokrousos et al., 2006). The following data (FROM MAIN DATASET REFERENCE) was collected with the hypothesis that fungal communities beneath hedgerows would differ to those in soils for the adjacent landscape components.
+
+The purpose of this script is to efficiently import the data, ensure it is tidy, and explore whether the hypothesis may be true. The methods should be sufficiently explained, with data visualization and ensuring the following script can be replicated on Github. 
